@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
 project(odtk_infer LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 find_package(CUDA REQUIRED)
 enable_language(CUDA)
 find_package(OpenCV REQUIRED)
@@ -25,6 +25,9 @@ add_library(odtk SHARED
   ../../csrc/engine.h
   ../../csrc/engine.cpp
   ../../csrc/calibrator.h
+)
+target_compile_options(odtk PRIVATE
+  $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda --expt-relaxed-constexpr>
 )
 set_target_properties(odtk PROPERTIES
   CUDA_RESOLVE_DEVICE_SYMBOLS ON

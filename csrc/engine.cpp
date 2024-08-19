@@ -103,7 +103,7 @@ Engine::Engine(const char *onnx_model, size_t onnx_size, const vector<int>& dyna
     auto builderConfig = std::unique_ptr<IBuilderConfig>(builder->createBuilderConfig());
     // Allow use of FP16 layers when running in INT8
     if(fp16 || int8) builderConfig->setFlag(BuilderFlag::kFP16);
-    builderConfig->setMaxWorkspaceSize(workspace_size);
+    builderConfig->setMemoryPoolLimit(MemoryPoolType::kWORKSPACE, workspace_size);
     
     // Parse ONNX FCN
     cout << "Building " << precision << " core model..." << endl;
@@ -199,23 +199,31 @@ void Engine::save(const string &path) {
 }
 
 void Engine::infer(vector<void *> &buffers, int batch){
-    auto dims = _engine->getBindingDimensions(0);
-    _context->setBindingDimensions(0, Dims4(batch, dims.d[1], dims.d[2], dims.d[3]));
-    _context->enqueueV2(buffers.data(), _stream, nullptr);
+    for (int32_t i = 0, e = _engine->getNbIOTensors(); i < e; i++)
+    {
+        auto const name = _engine->getIOTensorName(i);
+        _context->setTensorAddress(name, buffers.at(i));
+    }
+    _context->enqueueV3(_stream);
     cudaStreamSynchronize(_stream);
 }
 
 vector<int> Engine::getInputSize() {
-    auto dims = _engine->getBindingDimensions(0);
+    const auto dims = _engine->getTensorShape(
+	_engine->getIOTensorName(0)
+    );
     return {dims.d[2], dims.d[3]};
 }
 
 int Engine::getMaxBatchSize() {
-    return _engine->getMaxBatchSize();
+    return 1;
 }
 
 int Engine::getMaxDetections() {
-    return _engine->getBindingDimensions(1).d[1];
+    const auto dims = _engine->getTensorShape(
+        _engine->getIOTensorName(1)
+    );    
+    return dims.d[1];
 }
 
 int Engine::getStride() {
